@@ -1,28 +1,58 @@
 import { useState } from "react";
 import { useEffect } from "react";
 import { Form, Button } from "react-bootstrap";
+import { consultarColoresApi, crearColorApi } from "./helpers/queries";
 import Color from "./Color";
+import Swal from "sweetalert2";
+import { useForm } from "react-hook-form";
 
 const FormularioColores = () => {
-  const coloresLocalStorage = JSON.parse(localStorage.getItem('listaColores')) || [];
   const [color, setColor] = useState("");
-  const [arregloColores, setArregloColores] = useState(coloresLocalStorage);
+  const [colores, setColores] = useState([]);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+    setFocus,
+  } = useForm();
 
-  useEffect (()=> {
-    localStorage.setItem("listaColores", JSON.stringify(arregloColores))
-  })
+  setFocus("nombreColor");
 
-  const handleSubmit = (e)=> {
-    e.preventDefault();
-    setArregloColores([...arregloColores, color]);
-    setColor("");
-  }
+  useEffect(() => {
+    consultarColoresApi().then(
+      (respuesta) => {
+        setColores(respuesta);
+      },
+      (reason) => {
+        console.log(reason);
+        Swal.fire(
+          "Ocurrio un error",
+          "Intentelo nuevamente mas tarde",
+          "error"
+        );
+      }
+    );
+  }, []);
 
-  const borrarColor = (color) => {
-    let arregloMod = arregloColores.filter((item) => item !== color);
-
-    setArregloColores(arregloMod);
-  }
+  const onSubmit = (datos) => {
+    console.log(color);
+    crearColorApi(datos).then((respuesta) => {
+      if (respuesta.status === 201) {
+        Swal.fire(
+          "Color subido",
+          "El color fue subido exitosamente",
+          "success"
+        );
+        reset();
+        consultarColoresApi().then((respuesta) => {
+          setColores(respuesta);
+        });
+      } else {
+        Swal.fire("Ocurrio un error", "El color no se pudo subir", "error");
+      }
+    });
+  };
 
   return (
     <>
@@ -32,15 +62,31 @@ const FormularioColores = () => {
           style={{ background: color }}
         ></div>
         <div className="col-10 col-md-8 col-lg-10">
-          <Form className="d-flex align-items-center" onSubmit={handleSubmit}>
+          <Form
+            className="d-flex align-items-center"
+            onSubmit={handleSubmit(onSubmit)}
+          >
             <Form.Group className="w-100" controlId="formBasicEmail">
               <Form.Control
                 className="text-decoration-underline"
                 type="text"
                 placeholder="Ingrese un color ej blue"
-                onChange={(e)=> setColor(e.target.value)}
-                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                {...register("nombreColor", {
+                  required: "El nombre del color es obligatorio",
+                  minLength: {
+                    value: 3,
+                    message: "La cantidad de caracteres minima es de 3",
+                  },
+                  maxLength: {
+                    value: 20,
+                    message: "La cantidad de caracteres maxima es de 20",
+                  },
+                })}
               />
+              <Form.Text className="text-danger">
+                {errors.nombreColor?.message}
+              </Form.Text>
             </Form.Group>
             <Button className="shadow" variant="info" type="submit">
               Enviar
@@ -49,8 +95,8 @@ const FormularioColores = () => {
         </div>
       </section>
       <section className="d-flex justify-content-center justify-content-md-around flex-wrap mt-5">
-        {arregloColores.map((color, posicion) => (
-          <Color key={posicion} nombreColor={color} borrarColor={borrarColor}></Color>
+        {colores.map((color) => (
+          <Color key={color._id} color={color} setColores={setColores}></Color>
         ))}
       </section>
     </>
